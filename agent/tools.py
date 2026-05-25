@@ -6,7 +6,8 @@ Design Rules:
 4 Neverraise error it will crash the agent loop, instead return error message as string. let agent recover and try something else.
 5. keep return value short. Tool's output goes back to LLM's context window and context is expensive.
 """
-import wikipedia
+import time
+import wikipediaapi 
 from ddgs import DDGS
 from langchain_core.tools import tool
 
@@ -26,27 +27,33 @@ def web_search(query: str) -> str:
     Returns:
         A string with the top 3 search result titles and snippets.
     """
-    try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=3))
-            if not results:
-                return f"No results found for query: {query}"
-            
-            # Format results as a concise summary
-            formatted = []
-            for i, r in enumerate(results, 1):
-                title = r.get("title", "No title")
-                snippet = r.get("body", "No snippet")
-                url = r.get("href", "")
-                formatted.append(f"{i}. {title}\n{snippet}\n ({url})")
-            
-            return "\n\n".join(formatted)
-    except Exception as e:
-        # Tools never raise errors, return error message instead
-        return f"Web Search failed: {type(e).__name__}: {str(e)}"
-    
+    last_error = None
+    for attempt in range(3):  # retry up to 3 times
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.text(query, max_results=3, region="us-en"))
+            if results:                
+                # Format results as a concise summary
+                formatted = []
+                for i, r in enumerate(results, 1):
+                    title = r.get("title", "No title")
+                    snippet = r.get("body", "No snippet")
+                    url = r.get("href", "")
+                    formatted.append(f"{i}. {title}\n{snippet}\n ({url})")
+                
+                return "\n\n".join(formatted)
+            last_error = "No results found"
+        except Exception as e:
+            # Tools never raise errors, return error message instead
+            return f"Web Search failed: {type(e).__name__}: {str(e)}"
+        time.sleep(2 ** attempt)  # brief pause before retrying
+    return f"Web Search failed after 3 attempts: ({last_error}). Try rephrasing your query."
 
 # Tool 2: Wikipedia lookup
+_wiki = wikipediaapi.Wikipedia(
+    user_agent="ResearchBuddy-AI-Agent/0.1 (https://github.com/sent4ashu/ResearchBuddy-AI-Agent)",
+    language="en")  # create a wikipedia api instance
+
 @tool
 def wikipedia_lookup(topic: str) -> str:
     """ Look up factual information on Wikipedia. Use this for general knowledge questions, historical facts, scientific concepts, etc. 
@@ -57,14 +64,13 @@ def wikipedia_lookup(topic: str) -> str:
         str: The summary of the Wikipedia page.
     """
     try:
-        summary = wikipedia.summary(topic, sentences=3, auto_suggest=True)
-        return summary
-    except wikipedia.exceptions.DisambiguationError as e:
-        # On exception return the options so the agent re-query with a more specific topic
-        options = ", ".join(e.options[:5])  # show top 5 options
-        return f"Topic '{topic} is ambiguous. Did you mean: {options}?"
-    except wikipedia.exceptions.PageError:
-        return f"No Wikipedia page found for topic: {topic}"
+        page = _wiki.page(topic)
+        if not page.exists():
+            return f"No Wikipedia page found for topic: ({topic}). try rephrasing or be more specific."
+        summary = page.summary
+        sentences = summary.split(". ")
+        short = ". ".join(sentences[:3])  # take first 3 sentences for brevity
+        return short
     except Exception as e:
         return f"Wikipedia lookup failed: {type(e).__name__}: {str(e)}"
     
@@ -90,11 +96,21 @@ ALL_TOOLS = [web_search, wikipedia_lookup, calculator]
 
 if __name__ == "__main__":
     # Quick test of tools
-    print("Testing tools...")
-    print("\nWeb Search for 'Anthropic Claude 4 release':")
-    print(web_search.invoke("Anthropic Claude 4 release"))
-    
-    print("\nWikipedia lookup for 'Apache Spark':")
+    print("Testing each tool in isolation...\n")
+
+    print("--- web_search('Anthropic Claude AI company') ---")
+    print(web_search.invoke("Anthropic Claude AI company"))
+
+    print("\n--- wikipedia_lookup('Apache Spark') ---")
     print(wikipedia_lookup.invoke("Apache Spark"))
+
+    print("\n--- wikipedia_lookup('Snowflake database') ---")
+    print(wikipedia_lookup.invoke("Snowflake database"))
+
+    print("\n--- calculator('847 * 39') ---")
+    print(calculator.invoke("847 * 39"))
+
+    print("\n--- calculator('sqrt(169) + 2**10') ---")
+    print(calculator.invoke("sqrt(169) + 2**10"))
     
     

@@ -2,5 +2,5 @@ langchain==0.3.7
 langchain-groq==0.2.1
 python-dotenv==1.0.1
 ddgs==9.0.0
-wikipedia==1.4.0
+Wikipedia-API==0.8.1
 numexpr==2.10.1
