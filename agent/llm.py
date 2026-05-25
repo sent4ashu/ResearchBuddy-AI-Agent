@@ -18,5 +18,5 @@ def get_llm(model_name: str = "llama-3.3-70b-versatile", temperature: float = 0.
 # Quick smoke test
 if __name__ == "__main__":
     llm = get_llm()
-    response = llm.invoke("In one line, who is CEO of Impetus Technologies?")
+    response = llm.invoke("In one line, who is CEO of Impetus Technologies Inc?")
     print(response.content)
