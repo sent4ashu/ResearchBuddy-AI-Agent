@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 from agent.llm import get_llm
 from agent.tools import ALL_TOOLS
+from agent.memory import WindowedMemory
 
 # The system prompt now tells the LLM How to reason, not just Who to be.
 # Compare this to Step 3's prompt — that one said 'admit you can't look things up'.
@@ -21,16 +22,34 @@ SYSTEM_PROMPT = """You are ResearchBuddy, an AI research assistant with access t
 You have three tools available:
 - web_search: for current/recent information, news, prices, weather, real-time data
 - wikipedia_lookup: for factual, encyclopedic information (history, science, biographies)
-- calculator: for any arithmetic — never compute math in your head, you make mistakes
+- calculator: for arithmetic with actual numbers (e.g. "847 * 39", "sqrt(169)")
+
+CRITICAL RULE — when NOT to use tools (THIS IS MANDATORY):
+- Greetings ("hi", "hello", "hey"): respond conversationally, no tools.
+- Acknowledgments and thanks ("thanks", "ok", "got it", "cool", "great"):
+  respond with a brief acknowledgment like "You're welcome!" — NEVER call a tool.
+- Conversation closers ("bye", "see you"): say goodbye, no tools.
+- Questions about yourself or your capabilities: answer from your own knowledge.
+- Anything you already know with high confidence: answer directly.
+- A new short message is NOT a continuation of the previous research question.
+  Each turn is a fresh decision. Re-read the LATEST user message before deciding.
+
+Only use a tool when the LATEST user message genuinely needs it:
+- web_search: the LATEST message asks about something current or recent.
+- wikipedia_lookup: the LATEST message asks for a factual summary of a named entity.
+- calculator: the LATEST message contains numbers and an arithmetic operation.
+
+If a tool fails or returns nothing useful, do NOT keep calling the same tool with
+different inputs. Either try a different tool or answer from general knowledge
+and say you couldn't verify.
 
 Reasoning rules:
-- Think step by step. For complex questions, decide which tool to use first.
-- Use multiple tools if needed. For example: search for a fact, then calculate something with it.
-- If a tool returns an error or no useful result, try a different query or a different tool.
-- When you have enough information, give a concise final answer. Do not over-explain.
-- Cite the source briefly when you use web_search or wikipedia_lookup (e.g. "according to Wikipedia, ...").
+- Before any tool call, ask yourself: "what is the LATEST user message asking,
+  literally?" If it is conversational, do NOT call a tool.
+- Final answers should be concise. No filler.
 
-Never make up facts. If your tools can't find the answer, say so plainly.
+Never make up facts. Never fabricate tool results. If your tools can't find
+the answer, say so plainly.
 """
 
 def build_agent():
@@ -70,14 +89,16 @@ def build_agent():
 def run_chat():
     """ Interactive Chat loop with the Agent."""
     executor = build_agent()
+    memory = WindowedMemory(max_turns=5)    
 
     # Conversation history starts with system prompt
     # Every turn, we append users message and AI reply to this history
     chat_history: list = [] # List of HumanMessage and AIMessage objects
 
     print("=" * 60)
-    print("ResearchBuddy (ReAct Agent with tools)")
+    print("ResearchBuddy (ReAct Agent with Windowed Memory)")
     print("Type 'quit' or 'exit' to stop. Type 'reset' to clear the history.")
+    print("Type 'mem'to inspect current memory size.")
     print("=" * 60)
 
     while True:
@@ -92,19 +113,20 @@ def run_chat():
             chat_history = []
             print("Conversation history reset.")
             continue
+        if user_input.lower() == "mem":
+            print(f"(Current memory size: {len(memory)} messages./"
+                  f" {memory.max_turns} turn window)")
+            continue
     
         # Call the agent. It will handle all the internal reasoning and tool calls, and return a final answer when done.
-        result = executor.invoke({"input": user_input, "chat_history": chat_history})        
+        result = executor.invoke({"input": user_input, "chat_history": memory.get_messages()})        
 
         answer = result["output"]  # the agent's final answer after reasoning and tool use
         print(f"\nResearchBuddy: {answer}")
 
-        # Append user's message to history
-        chat_history.append(HumanMessage(content=user_input))
-
-        # Append AI's response to history
-        chat_history.append(AIMessage(content=answer))
-
+        # Append user's message and AI message to history
+        memory.add_turn(HumanMessage(content=user_input), AIMessage(content=answer))
+        
 
 if __name__ == "__main__":
     run_chat()
