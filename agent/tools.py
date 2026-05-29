@@ -31,7 +31,7 @@ def web_search(query: str) -> str:
     for attempt in range(3):  # retry up to 3 times
         try:
             with DDGS() as ddgs:
-                results = list(ddgs.text(query, max_results=3, region="us-en"))
+                results = list(ddgs.text(query, max_results=3, backend="lite"))
             if results:                
                 # Format results as a concise summary
                 formatted = []
