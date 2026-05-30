@@ -4,3 +4,4 @@ python-dotenv==1.0.1
 ddgs==9.0.0
 Wikipedia-API==0.8.1
 numexpr==2.10.1
+streamlit==1.40.2

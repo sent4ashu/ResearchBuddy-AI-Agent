@@ -6,13 +6,13 @@ from langchain_groq import ChatGroq
 # Load environment variables from .env file
 load_dotenv()   
 
-def get_llm(model_name: str = "llama-3.1-8b-instant", temperature: float = 0.2):
+def get_llm(model_name: str = "openai/gpt-oss-20b", temperature: float = 0.2):
     """Returns configured Groq Chat Model instance."""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY not found in environment variables.")
     
-    return ChatGroq(model=model_name, temperature=temperature, groq_api_key=api_key, streaming=False)
+    return ChatGroq(model=model_name, temperature=temperature, groq_api_key=api_key,  disable_streaming=True,)
 
 
 # Quick smoke test

@@ -82,7 +82,7 @@ def build_agent():
         verbose=True,           # print Thought/Action/Observation to terminal — turn off in production
         max_iterations=6,       # hard cap — agent gives up after 6 tool calls
         handle_parsing_errors=True,  # don't crash if LLM emits malformed tool call; retry
-        return_intermediate_steps=False, # set True later if you want to inspect the trace programmatically
+        return_intermediate_steps=True, # set False later if you want to inspect the trace programmatically
         early_stopping_method="force"  
     )
 
