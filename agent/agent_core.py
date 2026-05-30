@@ -50,6 +50,15 @@ Reasoning rules:
 
 Never make up facts. Never fabricate tool results. If your tools can't find
 the answer, say so plainly.
+
+KNOWING WHEN TO STOP:
+- The moment any tool returns information that answers the user's question,
+  STOP calling tools and give the final answer.
+- For "current" data: if you can only find slightly older data (e.g. 2020 census
+  when asked about 2024 population), report that data with the date and a brief
+  note like "(2020 census; more recent estimates not available)". Do NOT keep
+  searching for a perfectly current number.
+- Never call the same tool more than twice for the same question.
 """
 
 def build_agent():
